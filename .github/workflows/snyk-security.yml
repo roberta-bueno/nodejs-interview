@@ -1,0 +1,51 @@
+
+name: Snyk Open Source Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snyk-scan:
+    name: Snyk Test and Monitor
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Snyk CLI using npm
+        run: npm install -g snyk
+
+      - name: Verify Snyk CLI
+        run: snyk --version
+
+      - name: Run Snyk Test
+        id: snyk_test
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk test --all-projects --detection-depth=10 --severity-threshold=low
+
+      - name: Run Snyk Monitor
+        if: always()
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk monitor --all-projects --detection-depth=10
+
+      - name: Report security test status
+        if: steps.snyk_test.outcome == 'failure'
+        run: exit 1
